@@ -23,6 +23,8 @@ public:
     void load_file(const std::string& file_path);
     void load_file(std::string& file_path);
 
+    void show_file_header() const;
+
 private:
     void load_memory_map(const std::string& file_path);
     void initialize_members(std::string file_path = std::string(),
