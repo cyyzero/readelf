@@ -28,7 +28,7 @@ ELF_parser::ELF_parser(const std::string& file_path)
     load_memory_map();
 }
 
-ELF_parser::ELF_parser(std::stirng&& file_path)
+ELF_parser::ELF_parser(std::string&& file_path)
     : m_file_path(std::move(file_path))
 {
     load_memory_map();
@@ -51,6 +51,7 @@ ELF_parser& ELF_parser::operator=(const ELF_parser& object)
 {
     initialize_members(object.m_file_path, object.m_fd, object.m_program_length,
                        object.m_mmap_program);
+    return *this;
 }
 
 ELF_parser& ELF_parser::operator=(ELF_parser&& object)
@@ -59,6 +60,7 @@ ELF_parser& ELF_parser::operator=(ELF_parser&& object)
                        object.m_program_length, object.m_mmap_program);
 
     object.initialize_members();
+    return *this;
 }
 
 ELF_parser::~ELF_parser()
@@ -74,7 +76,7 @@ void ELF_parser::load_file(const std::string& path_name)
     load_memory_map();
 }
 
-void ELF_parser::load_file(std::string&& path_name)
+void ELF_parser::load_file(std::string&& file_path)
 {
     m_file_path = std::move(file_path);
     close_memory_map();
@@ -83,9 +85,9 @@ void ELF_parser::load_file(std::string&& path_name)
 
 void ELF_parser::show_file_header() const
 {
-    Elf64_Ehdr *file_header = static_cast<Elf64_Ehdr *>(m_mmap_program);
+    const Elf64_Ehdr * const file_header = reinterpret_cast<const Elf64_Ehdr *const>(m_mmap_program);
 
-    if (file_header->e_ident[EI_MAG0] != ELFMAG0 || file_haader->e_ident[EI_MAG1] != ELFMAG1 ||
+    if (file_header->e_ident[EI_MAG0] != ELFMAG0 || file_header->e_ident[EI_MAG1] != ELFMAG1 ||
         file_header->e_ident[EI_MAG2] != ELFMAG2 || file_header->e_ident[EI_MAG3] != ELFMAG3)
     {
         printf("It's not a ELF file.\n");
@@ -99,14 +101,15 @@ void ELF_parser::show_file_header() const
     }
 
     printf("ELF Header:\n");
-    printf("Magic:")
+    printf("  Magic:  ");
     for (int i = 0; i < EI_NIDENT; ++i)
     {
-        printf(" %x", file_header->e_ident[i]);
+        printf(" %02x", file_header->e_ident[i]);
     }
+    printf("\n");
 
-    printf("Class:");
-    switch (file_headder->e_ident[EI_CLASS])
+    printf("  Class:                             ");
+    switch (file_header->e_ident[EI_CLASS])
     {
     case ELFCLASSNONE:
         printf("INVALID\n");
@@ -122,7 +125,7 @@ void ELF_parser::show_file_header() const
         break;
     }
 
-    printf("Data:");
+    printf("  Data:                              ");
     switch (file_header->e_ident[EI_DATA])
     {
     case ELFDATANONE:
@@ -139,15 +142,12 @@ void ELF_parser::show_file_header() const
         break;
     }
 
-    printf("Version:");
+    printf("  Version:                           ");
     printf("%d\n", (int)file_header->e_ident[EI_ABIVERSION]);
 
-    printf("OS/ABI:");
+    printf("  OS/ABI:                            ");
     switch (file_header->e_ident[EI_OSABI])
     {
-    case ELFOSABI_NONE:
-        printf("None\n");
-        break;
     case ELFOSABI_SYSV:
         printf("UNIX System V ABI\n");
         break;
@@ -183,7 +183,7 @@ void ELF_parser::show_file_header() const
         break;
     }
 
-    printf("Type:");
+    printf("  Type:                              ");
     switch (file_header->e_type)
     {
     case ET_NONE:
@@ -206,8 +206,8 @@ void ELF_parser::show_file_header() const
         break;
     }
 
-    printf("Machine:");
-    swtich (file_header->e_machine)
+    printf("  Machine:                           ");
+    switch (file_header->e_machine)
     {
     case EM_NONE:
         printf("unknown machine\n");
@@ -271,7 +271,7 @@ void ELF_parser::show_file_header() const
         break;
     }
 
-    printf("Version:");
+    printf("  Version:                           ");
     switch (file_header->e_ident[EI_VERSION])
     {
     case EV_NONE:
@@ -285,50 +285,50 @@ void ELF_parser::show_file_header() const
         break;
     }
 
-    printf("Entry point address:");
-    printf("0x%x\n", file_header->e_entry);
+    printf("  Entry point address:               ");
+    printf("0x%lx\n", file_header->e_entry);
 
-    printf("Start of program headers:");
-    printf("%d (bytes into file)\n", file_header->e_phoff);
+    printf("  Start of program headers:          ");
+    printf("%ld (bytes into file)\n", file_header->e_phoff);
 
-    printf("Start of section headers:");
-    printf("%d (bytes into file)\n", file_header->e_shoff);
+    printf("  Start of section headers:          ");
+    printf("%ld (bytes into file)\n", file_header->e_shoff);
 
-    printf("Flags:");
+    printf("  Flags:                             ");
     printf("0x%x\n", file_header->e_flags);
 
-    printf("Size of this header:");
+    printf("  Size of this header:               ");
     printf("%d (bytes)\n", file_header->e_ehsize);
 
-    printf("Size of program headers:");
+    printf("  Size of program headers:           ");
     printf("%d (bytes)\n", file_header->e_phentsize);
 
-    printf("Number of program headers:");
+    printf("  Number of program headers:         ");
     printf("%d\n", file_header->e_phnum < PN_XNUM ? file_header->e_phnum : 
                    ((Elf64_Shdr *)(&m_mmap_program[file_header->e_shoff]))->sh_info);
 
-    printf("Size of section headers:");
+    printf("  Size of section headers:           ");
     printf("%d (bytes)\n", file_header->e_shentsize);
 
-    printf("Number of section headers:");
-    auto shnum = static_cast<Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_size;
+    printf("  Number of section headers:         ");
+    auto shnum = reinterpret_cast<const Elf64_Shdr *const>(&m_mmap_program[file_header->e_shoff])->sh_size;
     if (shnum == 0)
     {
         printf("%d\n", file_header->e_shnum);
     }
     else
     {
-        printf("%d\n", shnum);
+        printf("%ld\n", shnum);
     }
 
-    printf("Section header string table index:");
+    printf("  Section header string table index: ");
     switch (file_header->e_shstrndx)
     {
     case SHN_UNDEF:
         printf("undefined value\n");
         break;
     case SHN_XINDEX:
-        printf("%d\n", ((Elf64_Shdr *)(&m_mmap_program[file_header->e_shoff]))->sh_link);
+        printf("%d\n", reinterpret_cast<const Elf64_Shdr *const>(&m_mmap_program[file_header->e_shoff])->sh_link);
         break;
     default:
         printf("%d\n", file_header->e_shstrndx);
@@ -341,19 +341,19 @@ void ELF_parser::load_memory_map()
     void *mmap_res;
     struct stat st;
 
-    if ((m_fd = open(m_path_name.c_str(), O_RDONLY)) == -1)
+    if ((m_fd = open(m_file_path.c_str(), O_RDONLY)) == -1)
     {
         ERROR_EXIT("open");
     }
 
-    if (fstat(fd, &st) == -1)
+    if (fstat(m_fd, &st) == -1)
     {
         ERROR_EXIT("fstat");
     }
 
     m_program_length = static_cast<std::size_t>(st.st_size);
 
-    mmap_res = mmap((void *)0, m_program_length, PROT_READ, MAP_PRIVATE, fd, 0);
+    mmap_res = mmap((void *)0, m_program_length, PROT_READ, MAP_PRIVATE, m_fd, 0);
     if (mmap_res == MAP_FAILED)
     {
         ERROR_EXIT("mmap");
