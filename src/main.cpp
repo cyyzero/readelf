@@ -7,6 +7,7 @@ int main()
     ELF_parser s("./main");
 
     s.show_file_header();
+    s.show_section_headers();
 
     return 0;
 }

@@ -1,4 +1,5 @@
 #include <string>
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <elf.h>
@@ -85,7 +86,7 @@ void ELF_parser::load_file(std::string&& file_path)
 
 void ELF_parser::show_file_header() const
 {
-    const Elf64_Ehdr * const file_header = reinterpret_cast<const Elf64_Ehdr *const>(m_mmap_program);
+    auto file_header = reinterpret_cast<const Elf64_Ehdr *const>(m_mmap_program);
 
     if (file_header->e_ident[EI_MAG0] != ELFMAG0 || file_header->e_ident[EI_MAG1] != ELFMAG1 ||
         file_header->e_ident[EI_MAG2] != ELFMAG2 || file_header->e_ident[EI_MAG3] != ELFMAG3)
@@ -334,6 +335,116 @@ void ELF_parser::show_file_header() const
         printf("%d\n", file_header->e_shstrndx);
         break;
     }
+}
+
+void ELF_parser::show_section_headers() const
+{
+    const Elf64_Ehdr *const file_header = reinterpret_cast<const Elf64_Ehdr * const>(m_mmap_program);
+    const Elf64_Shdr *const shdr = reinterpret_cast<const Elf64_Shdr *const>(m_mmap_program + file_header->e_shoff);;
+    const char *const section_name_table = reinterpret_cast<const char *const>(&m_mmap_program[shdr[file_header->e_shstrndx].sh_offset]);;
+    Elf64_Xword shnum;
+
+    shnum = reinterpret_cast<const Elf64_Shdr *const>(&m_mmap_program[file_header->e_shoff])->sh_size;
+    if (shnum == 0)
+    {
+        shnum = file_header->e_shnum;
+    }
+
+    printf("There are %ld section header%s, starting at offset 0x%lx:\n\n", shnum, 
+           shnum > 1 ? "s" : "", file_header->e_shoff);
+    printf("Section Headers:\n"
+           "  [Nr] Name              Type             Address           Offset\n"
+           "       Size              EntSize          Flags  Link  Info  Align\n");
+    for (int i = 0; i < shnum; ++i)
+    {
+        printf("  [%2d] ", i);
+        printf("%-16s  ", section_name_table+shdr[i].sh_name);
+        switch (shdr[i].sh_type)
+        {
+        case SHT_NULL:
+            printf("NULL             ");
+            break;
+        case SHT_PROGBITS:
+            printf("PROGBITS         ");
+            break;
+        case SHT_SYMTAB:
+            printf("SYMTAB           ");
+            break;
+        case SHT_STRTAB:
+            printf("STRTAB           ");
+            break;
+        case SHT_RELA:
+            printf("RELA             ");
+            break;
+        case SHT_HASH:
+            printf("HASH             ");
+            break;
+        case SHT_NOTE:
+            printf("NOTE             ");
+            break;
+        case SHT_REL:
+            printf("REL              ");
+            break;
+        case SHT_SHLIB:
+            printf("SHLIB            ");
+            break;
+        case SHT_DYNAMIC:
+            printf("DYNSYM           ");
+            break;
+        default:
+            printf("Unknown          ");
+            break;
+        }
+        printf("%016lx  ", shdr[i].sh_addr);
+        printf("%08lx\n", shdr[i].sh_offset);
+        printf("       %016lx  ", shdr[i].sh_size);
+        printf("%016lx ", shdr[i].sh_entsize);
+
+        std::string flags;
+        if (shdr[i].sh_flags & SHF_WRITE);
+            flags.push_back('W');
+        if (shdr[i].sh_flags & SHF_ALLOC);
+            flags.push_back('A');
+        if (shdr[i].sh_flags & SHF_EXECINSTR)
+            flags.push_back('X');
+        if (shdr[i].sh_flags & SHF_MERGE)
+            flags.push_back('M');
+        if (shdr[i].sh_flags & SHF_STRINGS)
+            flags.push_back('S');
+        if (shdr[i].sh_flags & SHF_INFO_LINK)
+            flags.push_back('I');
+        if (shdr[i].sh_flags & SHF_LINK_ORDER)
+            flags.push_back('L');
+        if (shdr[i].sh_flags &  SHF_INFO_LINK)
+            flags.push_back('I');
+        if (shdr[i].sh_flags & SHF_OS_NONCONFORMING)
+            flags.push_back('O');
+        if (shdr[i].sh_flags & SHF_GROUP)
+            flags.push_back('G');
+        if (shdr[i].sh_flags & SHF_TLS)
+            flags.push_back('T');
+        if (shdr[i].sh_flags & SHF_COMPRESSED)
+            flags.push_back('l');
+        if (shdr[i].sh_flags & SHF_MASKOS)
+            flags.push_back('o');
+        if (shdr[i].sh_flags & SHF_MASKPROC)
+            flags.push_back('p');
+        if (shdr[i].sh_flags & SHF_ORDERED)
+            flags.push_back('x');
+        if (shdr[i].sh_flags & SHF_EXCLUDE)
+            flags.push_back('E');
+
+        std::sort(flags.begin(), flags.end());
+        printf("%5s  ", flags.c_str());
+        printf("%4d  ", shdr[i].sh_link);
+        printf("%4d  ", shdr[i].sh_info);
+        printf("%4lu\n", shdr[i].sh_addralign);
+    }
+    printf("Key to Flags:\n"
+           "  W (write), A (alloc), X (execute), M (merge), S (strings), l (large)\n"
+           "  I (info), L (link order), G (group), T (TLS), E (exclude), x (unknown)\n"
+           "  O (extra OS processing required) o (OS specific), p (processor specific)\n");
+
 }
 
 void ELF_parser::load_memory_map()

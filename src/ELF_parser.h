@@ -23,6 +23,7 @@ public:
     void load_file(std::string&& file_path);
 
     void show_file_header() const;
+    void show_section_headers() const;
 
 private:
     void load_memory_map();
