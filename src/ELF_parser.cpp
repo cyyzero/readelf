@@ -88,6 +88,19 @@ void ELF_parser::show_file_header() const
 {
     auto file_header = reinterpret_cast<const Elf64_Ehdr *const>(m_mmap_program);
 
+    /*
+    * Within this  array  everything  is  named  by  macros,  which start with the prefix 
+    * EI_ and may contain values which start with the prefix ELF. 
+    * 
+    * EI_MAG0: The first byte of the magic number.  It must  be  filled  with  ELFMAG0.
+    *          (0: 0x7f)
+    * EI_MAG1: The  second  byte  of the magic number.  It must be filled with ELFMAG1.
+    *          (1: 'E')
+    * EI_MAG2: The third byte of the magic number.  It must  be  filled  with  ELFMAG2.
+    *          (2: 'L')
+    * EI_MAG3: The  fourth  byte  of the magic number.  It must be filled with ELFMAG3.
+    *          (3: 'F')
+    */
     if (file_header->e_ident[EI_MAG0] != ELFMAG0 || file_header->e_ident[EI_MAG1] != ELFMAG1 ||
         file_header->e_ident[EI_MAG2] != ELFMAG2 || file_header->e_ident[EI_MAG3] != ELFMAG3)
     {
@@ -102,6 +115,10 @@ void ELF_parser::show_file_header() const
     }
 
     printf("ELF Header:\n");
+
+    /*
+    * Magic number and other info
+    */
     printf("  Magic:  ");
     for (int i = 0; i < EI_NIDENT; ++i)
     {
@@ -109,6 +126,15 @@ void ELF_parser::show_file_header() const
     }
     printf("\n");
 
+    /*
+    * EI_CLASS: The fifth byte identifies the architecture for this binary:
+    * 
+    *   ELFCLASSNONE: This class is invalid.
+    *   ELFCLASS32  : This  defines  the  32-bit  architecture.    It   supports
+    *                 machines  with  files  and  virtual address spaces up to 4
+    *                 Gigabytes.
+    *   ELFCLASS64  : This defines the 64-bit architecture.
+    */
     printf("  Class:                             ");
     switch (file_header->e_ident[EI_CLASS])
     {
@@ -126,6 +152,14 @@ void ELF_parser::show_file_header() const
         break;
     }
 
+    /*
+    * EI_DATA: The sixth byte specifies the data  encoding  of  the  processor-specific
+    *         data in the file.  Currently these encodings are supported:
+    *
+    *     ELFDATANONE: Unknown data format.
+    *     ELFDATA2LSB: Two's complement, little-endian.
+    *     ELFDATA2MSB: Two's complement, big-endian.
+    */
     printf("  Data:                              ");
     switch (file_header->e_ident[EI_DATA])
     {
@@ -143,9 +177,35 @@ void ELF_parser::show_file_header() const
         break;
     }
 
+    /*
+    * EI_ABIVERSION:
+    *      The ninth byte identifies the version of the ABI to which the object  is
+    *      targeted.  This field is used to distinguish among incompatible versions
+    *      of an ABI.  The interpretation of this version number  is  dependent  on
+    *      the  ABI  identified  by the EI_OSABI field.  Applications conforming to
+    *      this specification use the value 0.
+    */
     printf("  Version:                           ");
     printf("%d\n", (int)file_header->e_ident[EI_ABIVERSION]);
 
+    /*
+    * EI_OSABI: The  eighth  byte  identifies  the operating system and ABI to which the
+    *           object is targeted.  Some fields in other ELF structures have flags  and
+    *           values that have platform-specific meanings; the interpretation of those
+    *           fields is determined by the value of this byte.  For example:
+    * 
+    *     ELFOSABI_NONE       Same as ELFOSABI_SYSV
+    *     ELFOSABI_SYSV       UNIX System V ABI.
+    *     ELFOSABI_HPUX       HP-UX ABI.
+    *     ELFOSABI_NETBSD     NetBSD ABI.
+    *     ELFOSABI_LINUX      Linux ABI.
+    *     ELFOSABI_SOLARIS    Solaris ABI.
+    *     ELFOSABI_IRIX       IRIX ABI.
+    *     ELFOSABI_FREEBSD    FreeBSD ABI.
+    *     ELFOSABI_TRU64      TRU64 UNIX ABI.
+    *     ELFOSABI_ARM        ARM architecture ABI.
+    *     ELFOSABI_STANDALONE Stand-alone (embedded) ABI.
+    */
     printf("  OS/ABI:                            ");
     switch (file_header->e_ident[EI_OSABI])
     {
@@ -180,10 +240,19 @@ void ELF_parser::show_file_header() const
         printf("Stand-alone (embedded) ABI\n");
         break;
     default:
-        printf("error\n");
+        printf("Unknown ABI\n");
         break;
     }
 
+    /*
+    * e_type: This member of the structure identifies the object file type:
+    *
+    *     ET_NONE: An unknown type.
+    *     ET_REL : A relocatable file.
+    *     ET_EXEC: An executable file.
+    *     ET_DYN : A shared object.
+    *     ET_CORE: A core file.
+    */
     printf("  Type:                              ");
     switch (file_header->e_type)
     {
@@ -207,6 +276,30 @@ void ELF_parser::show_file_header() const
         break;
     }
 
+    /*
+    * e_machine: This member specifies the required architecture for an individual file.   
+    *            For  example:
+    *     EM_NONE     An unknown machine.
+    *     EM_M32      AT&T WE 32100.
+    *     EM_SPARC    Sun Microsystems SPARC.
+    *     EM_386      Intel 80386.
+    *     EM_68K      Motorola 68000.
+    *     EM_88K      Motorola 88000.
+    *     EM_860      Intel 80860.
+    *     EM_MIPS     MIPS RS3000 (big-endian only).
+    *     EM_PARISC   HP/PA.
+    *     EM_SPARC32PLUS
+    *                 SPARC with enhanced instruction set.
+    *     EM_PPC      PowerPC.
+    *     EM_PPC64    PowerPC 64-bit.
+    *     EM_S390     IBM S/390
+    *     EM_ARM      Advanced RISC Machines
+    *     EM_SH       Renesas SuperH
+    *     EM_SPARCV9  SPARC v9 64-bit.
+    *     EM_IA_64    Intel Itanium
+    *     EM_X86_64   AMD x86-64
+    *     EM_VAX      DEC Vax.
+    */
     printf("  Machine:                           ");
     switch (file_header->e_machine)
     {
@@ -272,6 +365,12 @@ void ELF_parser::show_file_header() const
         break;
     }
 
+    /*
+    * e_version: This member identifies the file version:
+    * 
+    *     EV_NONE   : Invalid version.
+    *     EV_CURRENT: Current version.
+    */
     printf("  Version:                           ");
     switch (file_header->e_ident[EI_VERSION])
     {
@@ -286,31 +385,82 @@ void ELF_parser::show_file_header() const
         break;
     }
 
+    /*
+    * e_entry: This  member  gives the virtual address to which the system first transfers control,
+    *          thus starting the process.  If the file has no associated entry point,  this  member
+    *          holds zero.
+    */
     printf("  Entry point address:               ");
     printf("0x%lx\n", file_header->e_entry);
 
+    /*
+    * e_phoff: This  member holds the program header table's file offset in bytes.  If the file has
+    *          no program header table, this member holds zero.
+    */
     printf("  Start of program headers:          ");
     printf("%ld (bytes into file)\n", file_header->e_phoff);
 
+    /*
+    * e_shoff: This member holds the section header table's file offset in bytes.  If the file  has
+    *          no section header table, this member holds zero.
+    */
     printf("  Start of section headers:          ");
     printf("%ld (bytes into file)\n", file_header->e_shoff);
 
+    /*
+    * e_flags: This  member  holds  processor-specific  flags associated with the file.  Flag names
+    *          take the form EF_`machine_flag'.  Currently no flags have been defined.
+    */
     printf("  Flags:                             ");
     printf("0x%x\n", file_header->e_flags);
 
+    /*
+    * e_ehsize: This member holds the ELF header's size in bytes.
+    */
     printf("  Size of this header:               ");
     printf("%d (bytes)\n", file_header->e_ehsize);
 
+    /*
+    * e_phentsize: This member holds the size in bytes of one entry in the file's program header table;
+    *              all entries are the same size.
+
+    */
     printf("  Size of program headers:           ");
     printf("%d (bytes)\n", file_header->e_phentsize);
 
+    /*
+    * e_phnum: This member holds the number of entries in the program header table.  Thus the product
+    *          of e_phentsize and e_phnum gives the table's size in bytes.  If a  file  has  no
+    *          program header, e_phnum holds the value zero.
+    *
+    *          If  the  number  of  entries  in the program header table is larger than or equal to
+    *          PN_XNUM (0xffff), this member holds PN_XNUM (0xffff) and the real number of  entries
+    *          in  the  program  header table is held in the sh_info member of the initial entry in
+    *          section header table.  Otherwise, the sh_info member of the initial  entry  contains
+    *          the value zero.
+    */
     printf("  Number of program headers:         ");
     printf("%d\n", file_header->e_phnum < PN_XNUM ? file_header->e_phnum : 
                    ((Elf64_Shdr *)(&m_mmap_program[file_header->e_shoff]))->sh_info);
 
+    /*
+    * e_shentsize: This member holds a sections header's size in bytes.  A section header is one  entry
+    *              in the section header table; all entries are the same size.
+    */
     printf("  Size of section headers:           ");
     printf("%d (bytes)\n", file_header->e_shentsize);
 
+    /*
+    * e_shnum: This member holds the number of entries in the section header table.  Thus the prod‐
+    *          uct of e_shentsize and e_shnum gives the section header table's size in bytes.  If a
+    *          file has no section header table, e_shnum holds the value of zero.
+    *
+    *          If  the  number  of  entries  in the section header table is larger than or equal to
+    *          SHN_LORESERVE (0xff00), e_shnum holds the value zero and the real number of  entries
+    *          in  the  section  header table is held in the sh_size member of the initial entry in
+    *          section header table.  Otherwise, the sh_size member of the  initial  entry  in  the
+    *          section header table holds the value zero.
+    */
     printf("  Number of section headers:         ");
     auto shnum = reinterpret_cast<const Elf64_Shdr *const>(&m_mmap_program[file_header->e_shoff])->sh_size;
     if (shnum == 0)
@@ -322,6 +472,17 @@ void ELF_parser::show_file_header() const
         printf("%ld\n", shnum);
     }
 
+    /*
+    * e_shstrndx: This  member  holds  the section header table index of the entry associated with the
+    *             section name string table.  If the file has no section name string table, this  mem‐
+    *             ber holds the value SHN_UNDEF.
+    *
+    *             If  the  index  of  section  name  string  table  section is larger than or equal to
+    *             SHN_LORESERVE (0xff00), this member holds SHN_XINDEX (0xffff) and the real index  of
+    *             the  section  name string table section is held in the sh_link member of the initial
+    *             entry in section header table.  Otherwise, the sh_link member of the  initial  entry
+    *             in section header table contains the value zero.
+    */
     printf("  Section header string table index: ");
     switch (file_header->e_shstrndx)
     {
