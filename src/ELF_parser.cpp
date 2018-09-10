@@ -519,7 +519,17 @@ void ELF_parser::show_section_headers() const
     for (int i = 0; i < shnum; ++i)
     {
         printf("  [%2d] ", i);
+
+        /*
+        * sh_name: This member specifies the name of the section.  Its value is an index into  the
+        * section header string table section, giving the location of a null-terminated string.
+        */
         printf("%-16s  ", section_name_table+shdr[i].sh_name);
+
+        /*
+        * sh_type: This member categorizes the section's contents and semantics.
+        * 
+        */
         switch (shdr[i].sh_type)
         {
         case SHT_NULL:
@@ -556,11 +566,42 @@ void ELF_parser::show_section_headers() const
             printf("Unknown          ");
             break;
         }
+
+        /*
+        * sh_addr: If  this  section  appears  in  the  memory image of a process, this member holds the
+        *          address at which the section's first byte should reside.  Otherwise, the member  con‐
+        *          tains zero.
+        */
         printf("%016lx  ", shdr[i].sh_addr);
+
+        /*
+        * sh_offset: This member's value holds the byte offset from the beginning of the file to the first
+        *            byte in the section.  One section type, SHT_NOBITS, occupies no space  in  the  file,
+        *            and its sh_offset member locates the conceptual placement in the file.
+        */
         printf("%08lx\n", shdr[i].sh_offset);
+
+        /*
+        * sh_size: This  member  holds  the  section's  size  in  bytes.   Unless  the  section  type is
+        *          SHT_NOBITS, the section occupies sh_size bytes  in  the  file.   A  section  of  type
+        *          SHT_NOBITS may have a nonzero size, but it occupies no space in the file.
+        */
         printf("       %016lx  ", shdr[i].sh_size);
+
+        /*
+        * sh_entsize:
+                 Some  sections hold a table of fixed-sized entries, such as a symbol table.  For such
+                 a section, this member gives the size in bytes for each entry.  This member  contains
+                 zero if the section does not hold a table of fixed-size entries.
+
+        */
         printf("%016lx ", shdr[i].sh_entsize);
 
+        /*
+        * sh_flags: Sections support one-bit flags that describe miscellaneous attributes.  If a flag bit
+        *           is set in sh_flags, the attribute is "on" for the section.  Otherwise, the  attribute
+        *           is "off" or does not apply.  Undefined attributes are set to zero.
+        */
         std::string flags;
         if (shdr[i].sh_flags & SHF_WRITE);
             flags.push_back('W');
