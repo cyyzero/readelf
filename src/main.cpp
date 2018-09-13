@@ -1,5 +1,5 @@
 #include "ELF_parser.h"
-#include <string>
+
 int main()
 {
     using elf_parser::ELF_parser;
