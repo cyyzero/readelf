@@ -24,6 +24,7 @@ public:
 
     void show_file_header() const;
     void show_section_headers() const;
+    void show_symbols() const;
 
 private:
     void load_memory_map();

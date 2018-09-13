@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <elf.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -501,8 +502,8 @@ void ELF_parser::show_file_header() const
 void ELF_parser::show_section_headers() const
 {
     const Elf64_Ehdr *const file_header = reinterpret_cast<const Elf64_Ehdr * const>(m_mmap_program);
-    const Elf64_Shdr *const shdr = reinterpret_cast<const Elf64_Shdr *const>(m_mmap_program + file_header->e_shoff);;
-    const char *const section_name_table = reinterpret_cast<const char *const>(&m_mmap_program[shdr[file_header->e_shstrndx].sh_offset]);;
+    const Elf64_Shdr *const shdr = reinterpret_cast<const Elf64_Shdr *const>(m_mmap_program + file_header->e_shoff);
+    const char *const string_table = reinterpret_cast<const char *const>(&m_mmap_program[shdr[file_header->e_shstrndx].sh_offset]);
     Elf64_Xword shnum;
 
     shnum = reinterpret_cast<const Elf64_Shdr *const>(&m_mmap_program[file_header->e_shoff])->sh_size;
@@ -524,7 +525,7 @@ void ELF_parser::show_section_headers() const
         * sh_name: This member specifies the name of the section.  Its value is an index into  the
         * section header string table section, giving the location of a null-terminated string.
         */
-        printf("%-16s  ", section_name_table+shdr[i].sh_name);
+        printf("%-16s  ", string_table+shdr[i].sh_name);
 
         /*
         * sh_type: This member categorizes the section's contents and semantics.
@@ -647,6 +648,125 @@ void ELF_parser::show_section_headers() const
            "  I (info), L (link order), G (group), T (TLS), E (exclude), x (unknown)\n"
            "  O (extra OS processing required) o (OS specific), p (processor specific)\n");
 
+}
+
+void ELF_parser::show_symbols() const
+{
+    Elf64_Ehdr *file_header;
+    Elf64_Shdr *section_table;
+    Elf64_Sym  *symbol_table;
+    char *symbol_string_table;
+    char *section_string_table;
+    Elf64_Xword section_number;
+    std::size_t symbol_entry_number;
+
+    file_header = reinterpret_cast<Elf64_Ehdr *>(m_mmap_program);
+    section_table = reinterpret_cast<Elf64_Shdr *>(m_mmap_program + file_header->e_shoff);
+    section_string_table = reinterpret_cast<char *>(m_mmap_program + section_table[file_header->e_shstrndx].sh_offset);
+    section_number = reinterpret_cast<Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_size;
+    if (section_number == 0)
+    {
+        section_number = file_header->e_shnum;
+    }
+
+    for (int i = 0; i < section_number; ++i)
+    {
+        if (section_table[i].sh_type == SHT_SYMTAB || section_table[i].sh_type == SHT_DYNSYM)
+        {
+            symbol_table = reinterpret_cast<Elf64_Sym *>(&m_mmap_program[section_table[i].sh_offset]);
+            symbol_entry_number = section_table[i].sh_size / section_table[i].sh_entsize;
+            symbol_string_table = reinterpret_cast<char *>(&m_mmap_program[section_table[i+1].sh_offset]);
+
+            printf("\nSymbol table '%s' contain %lu entrie%s:\n", &section_string_table[section_table[i].sh_name],
+                   symbol_entry_number, symbol_entry_number == 0 ? "" : "s");
+            printf("   Num:    Value          Size Type    Bind   Vis      Ndx Name\n");
+            for (int i = 0; i < symbol_entry_number; ++i)
+            {
+                printf("%6d: %016lx %5lu ", i, symbol_table[i].st_value, symbol_table[i].st_size);
+                switch (ELF64_ST_TYPE(symbol_table[i].st_info))
+                {
+                case STT_NOTYPE:
+                    printf("NOTYPE  ");
+                    break;
+                case STT_OBJECT:
+                    printf("OBJECT  ");
+                    break;
+                case STT_FUNC:
+                    printf("FUNC    ");
+                    break;
+                case STT_SECTION:
+                    printf("SECTION ");
+                    break;
+                case STT_FILE:
+                    printf("FILE    ");
+                    break;
+                case STT_COMMON:
+                    printf("COMMON  ");
+                    break;
+                case STT_TLS:
+                    printf("TLS     ");
+                    break;
+                default:
+                    printf("Unknown ");
+                    break;
+                }
+
+                switch (ELF64_ST_BIND(symbol_table[i].st_other))
+                {
+                case STB_LOCAL:
+                    printf("LOCAL  ");
+                    break;
+                case STB_GLOBAL:
+                    printf("GLOBAL ");
+                    break;
+                case STB_WEAK:
+                    printf("WEAK   ");
+                    break;
+                default:
+                    printf("Unknown");
+                }
+
+                switch (ELF64_ST_VISIBILITY(symbol_table[i].st_other))
+                {
+                case STV_DEFAULT:
+                    printf("DEFAULT  ");
+                    break;
+                case STV_INTERNAL:
+                    printf("INTERNAL ");
+                    break;
+                case STV_HIDDEN:
+                    printf("HIDDEN   ");
+                    break;
+                case STV_PROTECTED:
+                    printf("PROTECTED");
+                    break;
+                default:
+                    printf("Unknown  ");
+                    break;
+                }
+
+                switch (symbol_table[i].st_shndx)
+                {
+                case SHN_ABS:
+                    printf("ABS ");
+                    break;
+                case SHN_COMMON:
+                    printf("COM ");
+                    break;
+                case SHN_UNDEF:
+                    printf("UND ");
+                    break;
+                default:
+                    printf("%3d ", symbol_table[i].st_shndx);
+                    break;
+                }
+
+                printf("%s\n", &symbol_string_table[symbol_table[i].st_name]);
+            }
+        }
+    }
+
+    
 }
 
 void ELF_parser::load_memory_map()
