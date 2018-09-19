@@ -27,9 +27,9 @@ public:
     void show_symbols() const;
 
 private:
-    void load_memory_map();
-    void close_memory_map();
-    void initialize_members(std::string file_path = std::string(),
+    void __load_memory_map();
+    void __close_memory_map();
+    void __initialize_members(std::string file_path = std::string(),
                             int fd = -1,
                             std::size_t program_length = 0,
                             std::uint8_t *mmap_program = nullptr);
