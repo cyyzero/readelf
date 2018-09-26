@@ -87,7 +87,8 @@ void ELF_parser::load_file(std::string&& file_path)
 
 void ELF_parser::show_file_header() const
 {
-    auto file_header = reinterpret_cast<const Elf64_Ehdr *const>(m_mmap_program);
+    Elf64_Ehdr *file_header;
+    file_header = reinterpret_cast<Elf64_Ehdr *>(m_mmap_program);
 
     /*
     * Within this  array  everything  is  named  by  macros,  which start with the prefix 
@@ -501,23 +502,27 @@ void ELF_parser::show_file_header() const
 
 void ELF_parser::show_section_headers() const
 {
-    const Elf64_Ehdr *const file_header = reinterpret_cast<const Elf64_Ehdr * const>(m_mmap_program);
-    const Elf64_Shdr *const shdr = reinterpret_cast<const Elf64_Shdr *const>(m_mmap_program + file_header->e_shoff);
-    const char *const string_table = reinterpret_cast<const char *const>(&m_mmap_program[shdr[file_header->e_shstrndx].sh_offset]);
-    Elf64_Xword shnum;
+    const Elf64_Ehdr *file_header;
+    const Elf64_Shdr *section_table;
+    const char *section_string_table;
+    Elf64_Xword section_number;
 
-    shnum = reinterpret_cast<const Elf64_Shdr *const>(&m_mmap_program[file_header->e_shoff])->sh_size;
-    if (shnum == 0)
+    file_header = reinterpret_cast<const Elf64_Ehdr *>(m_mmap_program);
+    section_table = reinterpret_cast<const Elf64_Shdr *>(m_mmap_program + file_header->e_shoff);
+    section_string_table = reinterpret_cast<const char *>(&m_mmap_program[section_table[file_header->e_shstrndx].sh_offset]);
+
+    section_number = reinterpret_cast<const Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_size;
+    if (section_number == 0)
     {
-        shnum = file_header->e_shnum;
+        section_number = file_header->e_shnum;
     }
 
-    printf("There are %ld section header%s, starting at offset 0x%lx:\n\n", shnum, 
-           shnum > 1 ? "s" : "", file_header->e_shoff);
+    printf("There are %ld section header%s, starting at offset 0x%lx:\n\n", section_number, 
+           section_number > 1 ? "s" : "", file_header->e_shoff);
     printf("Section Headers:\n"
            "  [Nr] Name              Type             Address           Offset\n"
            "       Size              EntSize          Flags  Link  Info  Align\n");
-    for (int i = 0; i < shnum; ++i)
+    for (int i = 0; i < section_number; ++i)
     {
         printf("  [%2d] ", i);
 
@@ -525,13 +530,13 @@ void ELF_parser::show_section_headers() const
         * sh_name: This member specifies the name of the section.  Its value is an index into  the
         * section header string table section, giving the location of a null-terminated string.
         */
-        printf("%-16s  ", string_table+shdr[i].sh_name);
+        printf("%-16s  ", section_string_table+section_table[i].sh_name);
 
         /*
         * sh_type: This member categorizes the section's contents and semantics.
         * 
         */
-        switch (shdr[i].sh_type)
+        switch (section_table[i].sh_type)
         {
         case SHT_NULL:
             printf("NULL             ");
@@ -573,21 +578,21 @@ void ELF_parser::show_section_headers() const
         *          address at which the section's first byte should reside.  Otherwise, the member  con‐
         *          tains zero.
         */
-        printf("%016lx  ", shdr[i].sh_addr);
+        printf("%016lx  ", section_table[i].sh_addr);
 
         /*
         * sh_offset: This member's value holds the byte offset from the beginning of the file to the first
         *            byte in the section.  One section type, SHT_NOBITS, occupies no space  in  the  file,
         *            and its sh_offset member locates the conceptual placement in the file.
         */
-        printf("%08lx\n", shdr[i].sh_offset);
+        printf("%08lx\n", section_table[i].sh_offset);
 
         /*
         * sh_size: This  member  holds  the  section's  size  in  bytes.   Unless  the  section  type is
         *          SHT_NOBITS, the section occupies sh_size bytes  in  the  file.   A  section  of  type
         *          SHT_NOBITS may have a nonzero size, but it occupies no space in the file.
         */
-        printf("       %016lx  ", shdr[i].sh_size);
+        printf("       %016lx  ", section_table[i].sh_size);
 
         /*
         * sh_entsize:
@@ -596,7 +601,7 @@ void ELF_parser::show_section_headers() const
                  zero if the section does not hold a table of fixed-size entries.
 
         */
-        printf("%016lx ", shdr[i].sh_entsize);
+        printf("%016lx ", section_table[i].sh_entsize);
 
         /*
         * sh_flags: Sections support one-bit flags that describe miscellaneous attributes.  If a flag bit
@@ -604,44 +609,44 @@ void ELF_parser::show_section_headers() const
         *           is "off" or does not apply.  Undefined attributes are set to zero.
         */
         std::string flags;
-        if (shdr[i].sh_flags & SHF_WRITE);
+        if (section_table[i].sh_flags & SHF_WRITE);
             flags.push_back('W');
-        if (shdr[i].sh_flags & SHF_ALLOC);
+        if (section_table[i].sh_flags & SHF_ALLOC);
             flags.push_back('A');
-        if (shdr[i].sh_flags & SHF_EXECINSTR)
+        if (section_table[i].sh_flags & SHF_EXECINSTR)
             flags.push_back('X');
-        if (shdr[i].sh_flags & SHF_MERGE)
+        if (section_table[i].sh_flags & SHF_MERGE)
             flags.push_back('M');
-        if (shdr[i].sh_flags & SHF_STRINGS)
+        if (section_table[i].sh_flags & SHF_STRINGS)
             flags.push_back('S');
-        if (shdr[i].sh_flags & SHF_INFO_LINK)
+        if (section_table[i].sh_flags & SHF_INFO_LINK)
             flags.push_back('I');
-        if (shdr[i].sh_flags & SHF_LINK_ORDER)
+        if (section_table[i].sh_flags & SHF_LINK_ORDER)
             flags.push_back('L');
-        if (shdr[i].sh_flags &  SHF_INFO_LINK)
+        if (section_table[i].sh_flags &  SHF_INFO_LINK)
             flags.push_back('I');
-        if (shdr[i].sh_flags & SHF_OS_NONCONFORMING)
+        if (section_table[i].sh_flags & SHF_OS_NONCONFORMING)
             flags.push_back('O');
-        if (shdr[i].sh_flags & SHF_GROUP)
+        if (section_table[i].sh_flags & SHF_GROUP)
             flags.push_back('G');
-        if (shdr[i].sh_flags & SHF_TLS)
+        if (section_table[i].sh_flags & SHF_TLS)
             flags.push_back('T');
-        if (shdr[i].sh_flags & SHF_COMPRESSED)
+        if (section_table[i].sh_flags & SHF_COMPRESSED)
             flags.push_back('l');
-        if (shdr[i].sh_flags & SHF_MASKOS)
+        if (section_table[i].sh_flags & SHF_MASKOS)
             flags.push_back('o');
-        if (shdr[i].sh_flags & SHF_MASKPROC)
+        if (section_table[i].sh_flags & SHF_MASKPROC)
             flags.push_back('p');
-        if (shdr[i].sh_flags & SHF_ORDERED)
+        if (section_table[i].sh_flags & SHF_ORDERED)
             flags.push_back('x');
-        if (shdr[i].sh_flags & SHF_EXCLUDE)
+        if (section_table[i].sh_flags & SHF_EXCLUDE)
             flags.push_back('E');
 
         std::sort(flags.begin(), flags.end());
         printf("%5s  ", flags.c_str());
-        printf("%4d  ", shdr[i].sh_link);
-        printf("%4d  ", shdr[i].sh_info);
-        printf("%4lu\n", shdr[i].sh_addralign);
+        printf("%4d  ", section_table[i].sh_link);
+        printf("%4d  ", section_table[i].sh_info);
+        printf("%4lu\n", section_table[i].sh_addralign);
     }
     printf("Key to Flags:\n"
            "  W (write), A (alloc), X (execute), M (merge), S (strings), l (large)\n"
@@ -652,18 +657,18 @@ void ELF_parser::show_section_headers() const
 
 void ELF_parser::show_symbols() const
 {
-    Elf64_Ehdr *file_header;
-    Elf64_Shdr *section_table;
-    Elf64_Sym  *symbol_table;
-    char *symbol_string_table;
-    char *section_string_table;
+    const Elf64_Ehdr *file_header;
+    const Elf64_Shdr *section_table;
+    const Elf64_Sym  *symbol_table;
+    const char *symbol_string_table;
+    const char *section_string_table;
     Elf64_Xword section_number;
     std::size_t symbol_entry_number;
 
-    file_header = reinterpret_cast<Elf64_Ehdr *>(m_mmap_program);
-    section_table = reinterpret_cast<Elf64_Shdr *>(m_mmap_program + file_header->e_shoff);
-    section_string_table = reinterpret_cast<char *>(m_mmap_program + section_table[file_header->e_shstrndx].sh_offset);
-    section_number = reinterpret_cast<Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_size;
+    file_header = reinterpret_cast<const Elf64_Ehdr *>(m_mmap_program);
+    section_table = reinterpret_cast<const Elf64_Shdr *>(m_mmap_program + file_header->e_shoff);
+    section_string_table = reinterpret_cast<const char *>(m_mmap_program + section_table[file_header->e_shstrndx].sh_offset);
+    section_number = reinterpret_cast<const Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_size;
     if (section_number == 0)
     {
         section_number = file_header->e_shnum;
