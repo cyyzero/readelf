@@ -27,62 +27,62 @@ ELF_parser::ELF_parser()
 ELF_parser::ELF_parser(const std::string& file_path)
     : m_file_path(file_path)
 {
-    __load_memory_map();
+    load_memory_map();
 }
 
 ELF_parser::ELF_parser(std::string&& file_path)
     : m_file_path(std::move(file_path))
 {
-    __load_memory_map();
+    load_memory_map();
 }
 
 ELF_parser::ELF_parser(const ELF_parser& object)
     : m_file_path(object.m_file_path)
 {
-    __load_memory_map();
+    load_memory_map();
 }
 
 ELF_parser::ELF_parser(ELF_parser&& object)
     : m_file_path(std::move(object.m_file_path)), m_fd(object.m_fd),
     m_program_length(object.m_program_length), m_mmap_program(object.m_mmap_program)
 {
-    object.__initialize_members();
+    object.initialize_members();
 }
 
 ELF_parser& ELF_parser::operator=(const ELF_parser& object)
 {
-    __initialize_members(object.m_file_path, object.m_fd, object.m_program_length,
+    initialize_members(object.m_file_path, object.m_fd, object.m_program_length,
                        object.m_mmap_program);
     return *this;
 }
 
 ELF_parser& ELF_parser::operator=(ELF_parser&& object)
 {
-    __initialize_members(std::move(object.m_file_path), object.m_fd,
+    initialize_members(std::move(object.m_file_path), object.m_fd,
                        object.m_program_length, object.m_mmap_program);
 
-    object.__initialize_members();
+    object.initialize_members();
     return *this;
 }
 
 ELF_parser::~ELF_parser()
 {
 
-    __close_memory_map();
+    close_memory_map();
 }
 
 void ELF_parser::load_file(const std::string& path_name)
 {
     m_file_path = path_name;
-    __close_memory_map();
-    __load_memory_map();
+    close_memory_map();
+    load_memory_map();
 }
 
 void ELF_parser::load_file(std::string&& file_path)
 {
     m_file_path = std::move(file_path);
-    __close_memory_map();
-    __load_memory_map();
+    close_memory_map();
+    load_memory_map();
 }
 
 void ELF_parser::show_file_header() const
@@ -769,7 +769,7 @@ void ELF_parser::show_symbols() const
     
 }
 
-void ELF_parser::__load_memory_map()
+void ELF_parser::load_memory_map()
 {
     void *mmap_res;
     struct stat st;
@@ -795,7 +795,7 @@ void ELF_parser::__load_memory_map()
     m_mmap_program = static_cast<std::uint8_t *>(mmap_res);
 }
 
-void ELF_parser::__close_memory_map()
+void ELF_parser::close_memory_map()
 {
     if (m_fd == -1)
     {
@@ -812,10 +812,10 @@ void ELF_parser::__close_memory_map()
         ERROR_EXIT("close");
     }
 
-    __initialize_members();
+    initialize_members();
 }
 
-void ELF_parser::__initialize_members(std::string file_path, int fd, 
+void ELF_parser::initialize_members(std::string file_path, int fd, 
                                     std::size_t program_length, std::uint8_t *mmap_program)
 {
     m_file_path = std::move(file_path);
