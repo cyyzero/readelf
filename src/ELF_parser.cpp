@@ -87,7 +87,7 @@ void ELF_parser::load_file(std::string&& file_path)
 
 void ELF_parser::show_file_header() const
 {
-    Elf64_Ehdr *file_header;
+    const Elf64_Ehdr *file_header;
     file_header = reinterpret_cast<Elf64_Ehdr *>(m_mmap_program);
 
     /*
@@ -464,7 +464,7 @@ void ELF_parser::show_file_header() const
     *          section header table holds the value zero.
     */
     printf("  Number of section headers:         ");
-    auto shnum = reinterpret_cast<const Elf64_Shdr *const>(&m_mmap_program[file_header->e_shoff])->sh_size;
+    auto shnum = reinterpret_cast<const Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_size;
     if (shnum == 0)
     {
         printf("%d\n", file_header->e_shnum);
@@ -492,7 +492,7 @@ void ELF_parser::show_file_header() const
         printf("undefined value\n");
         break;
     case SHN_XINDEX:
-        printf("%d\n", reinterpret_cast<const Elf64_Shdr *const>(&m_mmap_program[file_header->e_shoff])->sh_link);
+        printf("%d\n", reinterpret_cast<const Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_link);
         break;
     default:
         printf("%d\n", file_header->e_shstrndx);
@@ -522,9 +522,9 @@ void ELF_parser::show_section_headers() const
     printf("Section Headers:\n"
            "  [Nr] Name              Type             Address           Offset\n"
            "       Size              EntSize          Flags  Link  Info  Align\n");
-    for (int i = 0; i < section_number; ++i)
+    for (decltype(section_number) i = 0; i < section_number; ++i)
     {
-        printf("  [%2d] ", i);
+        printf("  [%2lu] ", i);
 
         /*
         * sh_name: This member specifies the name of the section.  Its value is an index into  the
@@ -609,9 +609,9 @@ void ELF_parser::show_section_headers() const
         *           is "off" or does not apply.  Undefined attributes are set to zero.
         */
         std::string flags;
-        if (section_table[i].sh_flags & SHF_WRITE);
+        if (section_table[i].sh_flags & SHF_WRITE)
             flags.push_back('W');
-        if (section_table[i].sh_flags & SHF_ALLOC);
+        if (section_table[i].sh_flags & SHF_ALLOC)
             flags.push_back('A');
         if (section_table[i].sh_flags & SHF_EXECINSTR)
             flags.push_back('X');
@@ -674,7 +674,7 @@ void ELF_parser::show_symbols() const
         section_number = file_header->e_shnum;
     }
 
-    for (int i = 0; i < section_number; ++i)
+    for (decltype(section_number) i = 0; i < section_number; ++i)
     {
         if (section_table[i].sh_type == SHT_SYMTAB || section_table[i].sh_type == SHT_DYNSYM)
         {
@@ -685,9 +685,9 @@ void ELF_parser::show_symbols() const
             printf("\nSymbol table '%s' contain %lu entrie%s:\n", &section_string_table[section_table[i].sh_name],
                    symbol_entry_number, symbol_entry_number == 0 ? "" : "s");
             printf("   Num:    Value          Size Type    Bind   Vis      Ndx Name\n");
-            for (int i = 0; i < symbol_entry_number; ++i)
+            for (decltype(symbol_entry_number) i = 0; i < symbol_entry_number; ++i)
             {
-                printf("%6d: %016lx %5lu ", i, symbol_table[i].st_value, symbol_table[i].st_size);
+                printf("%6lu: %016lx %5lu ", i, symbol_table[i].st_value, symbol_table[i].st_size);
                 switch (ELF64_ST_TYPE(symbol_table[i].st_info))
                 {
                 case STT_NOTYPE:
