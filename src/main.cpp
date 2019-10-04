@@ -1,10 +1,10 @@
-#include "ELF_parser.h"
+#include "ELF_reader.h"
 
 int main()
 {
-    using elf_parser::ELF_parser;
+    using ELF::ELF_reader;
 
-    ELF_parser s("./main");
+    ELF_reader s("./readelf");
 
     s.show_file_header();
     s.show_section_headers();

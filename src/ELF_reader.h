@@ -4,23 +4,21 @@
 #include <cstdint>
 #include <string>
 
-namespace elf_parser
+namespace ELF
 {
 
-class ELF_parser
+class ELF_reader
 {
 public:
-    ELF_parser();
-    ELF_parser(const std::string& file_path);
-    ELF_parser(std::string&& file_path);
-    ELF_parser(const ELF_parser& object);
-    ELF_parser(ELF_parser&& object);
-    ELF_parser& operator=(const ELF_parser& object);
-    ELF_parser& operator=(ELF_parser&& object);
-    ~ELF_parser();
+    ELF_reader();
+    explicit ELF_reader(const std::string& file_path);
+    ELF_reader(const ELF_reader& object) = delete;
+    ELF_reader(ELF_reader&& object) noexcept;
+    ELF_reader& operator=(const ELF_reader& object) = delete;
+    ELF_reader& operator=(ELF_reader&& object) noexcept;
+    ~ELF_reader();
 
     void load_file(const std::string& file_path);
-    void load_file(std::string&& file_path);
 
     void show_file_header() const;
     void show_section_headers() const;
@@ -34,12 +32,12 @@ private:
                             std::size_t program_length = 0,
                             std::uint8_t *mmap_program = nullptr);
 
-    std::string m_file_path;
-    int m_fd;
-    std::size_t m_program_length;
-    std::uint8_t *m_mmap_program;
+    std::string file_path_;
+    int fd_;
+    std::size_t program_length_;
+    std::uint8_t *mmap_program_;
 };
 
-}
+} // namespace ELF
 
-#endif
+#endif // ELF_PARSER_H

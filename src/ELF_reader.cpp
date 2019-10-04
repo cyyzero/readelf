@@ -9,86 +9,59 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/types.h>
-#include "ELF_parser.h"
+#include "ELF_reader.h"
 
 #ifndef ERROR_EXIT
 #define ERROR_EXIT(msg) do { \
-    perror(msg);             \
-    exit(EXIT_FAILURE);      \
+    ::perror(msg);           \
+    ::exit(EXIT_FAILURE);    \
 } while (0)
 #endif
 
-namespace elf_parser
+namespace ELF
 {
 
-ELF_parser::ELF_parser()
-    : m_fd(-1), m_program_length(0) , m_mmap_program(nullptr) { }
+ELF_reader::ELF_reader()
+    : fd_(-1), program_length_(0) , mmap_program_(nullptr) { }
 
-ELF_parser::ELF_parser(const std::string& file_path)
-    : m_file_path(file_path)
-{
-    load_memory_map();
-}
-
-ELF_parser::ELF_parser(std::string&& file_path)
-    : m_file_path(std::move(file_path))
+ELF_reader::ELF_reader(const std::string& file_path)
+    : file_path_(file_path)
 {
     load_memory_map();
 }
 
-ELF_parser::ELF_parser(const ELF_parser& object)
-    : m_file_path(object.m_file_path)
-{
-    load_memory_map();
-}
-
-ELF_parser::ELF_parser(ELF_parser&& object)
-    : m_file_path(std::move(object.m_file_path)), m_fd(object.m_fd),
-    m_program_length(object.m_program_length), m_mmap_program(object.m_mmap_program)
+ELF_reader::ELF_reader(ELF_reader&& object) noexcept
+    : file_path_(std::move(object.file_path_)), fd_(object.fd_),
+    program_length_(object.program_length_), mmap_program_(object.mmap_program_)
 {
     object.initialize_members();
 }
 
-ELF_parser& ELF_parser::operator=(const ELF_parser& object)
+ELF_reader& ELF_reader::operator=(ELF_reader&& object) noexcept
 {
-    initialize_members(object.m_file_path, object.m_fd, object.m_program_length,
-                       object.m_mmap_program);
-    return *this;
-}
-
-ELF_parser& ELF_parser::operator=(ELF_parser&& object)
-{
-    initialize_members(std::move(object.m_file_path), object.m_fd,
-                       object.m_program_length, object.m_mmap_program);
+    initialize_members(std::move(object.file_path_), object.fd_,
+                       object.program_length_, object.mmap_program_);
 
     object.initialize_members();
     return *this;
 }
 
-ELF_parser::~ELF_parser()
+ELF_reader::~ELF_reader()
 {
-
     close_memory_map();
 }
 
-void ELF_parser::load_file(const std::string& path_name)
+void ELF_reader::load_file(const std::string& path_name)
 {
-    m_file_path = path_name;
-    close_memory_map();
-    load_memory_map();
-}
-
-void ELF_parser::load_file(std::string&& file_path)
-{
-    m_file_path = std::move(file_path);
+    file_path_ = path_name;
     close_memory_map();
     load_memory_map();
 }
 
-void ELF_parser::show_file_header() const
+void ELF_reader::show_file_header() const
 {
     const Elf64_Ehdr *file_header;
-    file_header = reinterpret_cast<Elf64_Ehdr *>(m_mmap_program);
+    file_header = reinterpret_cast<Elf64_Ehdr *>(mmap_program_);
 
     /*
     * Within this  array  everything  is  named  by  macros,  which start with the prefix 
@@ -443,7 +416,7 @@ void ELF_parser::show_file_header() const
     */
     printf("  Number of program headers:         ");
     printf("%d\n", file_header->e_phnum < PN_XNUM ? file_header->e_phnum : 
-                   ((Elf64_Shdr *)(&m_mmap_program[file_header->e_shoff]))->sh_info);
+                   ((Elf64_Shdr *)(&mmap_program_[file_header->e_shoff]))->sh_info);
 
     /*
     * e_shentsize: This member holds a sections header's size in bytes.  A section header is one  entry
@@ -464,7 +437,7 @@ void ELF_parser::show_file_header() const
     *          section header table holds the value zero.
     */
     printf("  Number of section headers:         ");
-    auto shnum = reinterpret_cast<const Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_size;
+    auto shnum = reinterpret_cast<const Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
     if (shnum == 0)
     {
         printf("%d\n", file_header->e_shnum);
@@ -492,7 +465,7 @@ void ELF_parser::show_file_header() const
         printf("undefined value\n");
         break;
     case SHN_XINDEX:
-        printf("%d\n", reinterpret_cast<const Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_link);
+        printf("%d\n", reinterpret_cast<const Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_link);
         break;
     default:
         printf("%d\n", file_header->e_shstrndx);
@@ -500,18 +473,18 @@ void ELF_parser::show_file_header() const
     }
 }
 
-void ELF_parser::show_section_headers() const
+void ELF_reader::show_section_headers() const
 {
     const Elf64_Ehdr *file_header;
     const Elf64_Shdr *section_table;
     const char *section_string_table;
     Elf64_Xword section_number;
 
-    file_header = reinterpret_cast<const Elf64_Ehdr *>(m_mmap_program);
-    section_table = reinterpret_cast<const Elf64_Shdr *>(m_mmap_program + file_header->e_shoff);
-    section_string_table = reinterpret_cast<const char *>(&m_mmap_program[section_table[file_header->e_shstrndx].sh_offset]);
+    file_header = reinterpret_cast<const Elf64_Ehdr *>(mmap_program_);
+    section_table = reinterpret_cast<const Elf64_Shdr *>(mmap_program_ + file_header->e_shoff);
+    section_string_table = reinterpret_cast<const char *>(&mmap_program_[section_table[file_header->e_shstrndx].sh_offset]);
 
-    section_number = reinterpret_cast<const Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_size;
+    section_number = reinterpret_cast<const Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
     if (section_number == 0)
     {
         section_number = file_header->e_shnum;
@@ -655,7 +628,7 @@ void ELF_parser::show_section_headers() const
 
 }
 
-void ELF_parser::show_symbols() const
+void ELF_reader::show_symbols() const
 {
     const Elf64_Ehdr *file_header;
     const Elf64_Shdr *section_table;
@@ -665,10 +638,10 @@ void ELF_parser::show_symbols() const
     Elf64_Xword section_number;
     std::size_t symbol_entry_number;
 
-    file_header = reinterpret_cast<const Elf64_Ehdr *>(m_mmap_program);
-    section_table = reinterpret_cast<const Elf64_Shdr *>(m_mmap_program + file_header->e_shoff);
-    section_string_table = reinterpret_cast<const char *>(m_mmap_program + section_table[file_header->e_shstrndx].sh_offset);
-    section_number = reinterpret_cast<const Elf64_Shdr *>(&m_mmap_program[file_header->e_shoff])->sh_size;
+    file_header = reinterpret_cast<const Elf64_Ehdr *>(mmap_program_);
+    section_table = reinterpret_cast<const Elf64_Shdr *>(mmap_program_ + file_header->e_shoff);
+    section_string_table = reinterpret_cast<const char *>(mmap_program_ + section_table[file_header->e_shstrndx].sh_offset);
+    section_number = reinterpret_cast<const Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
     if (section_number == 0)
     {
         section_number = file_header->e_shnum;
@@ -678,9 +651,9 @@ void ELF_parser::show_symbols() const
     {
         if (section_table[i].sh_type == SHT_SYMTAB || section_table[i].sh_type == SHT_DYNSYM)
         {
-            symbol_table = reinterpret_cast<Elf64_Sym *>(&m_mmap_program[section_table[i].sh_offset]);
+            symbol_table = reinterpret_cast<Elf64_Sym *>(&mmap_program_[section_table[i].sh_offset]);
             symbol_entry_number = section_table[i].sh_size / section_table[i].sh_entsize;
-            symbol_string_table = reinterpret_cast<char *>(&m_mmap_program[section_table[i+1].sh_offset]);
+            symbol_string_table = reinterpret_cast<char *>(&mmap_program_[section_table[i+1].sh_offset]);
 
             printf("\nSymbol table '%s' contain %lu entrie%s:\n", &section_string_table[section_table[i].sh_name],
                    symbol_entry_number, symbol_entry_number == 0 ? "" : "s");
@@ -774,59 +747,57 @@ void ELF_parser::show_symbols() const
     
 }
 
-void ELF_parser::load_memory_map()
+void ELF_reader::load_memory_map()
 {
     void *mmap_res;
     struct stat st;
 
-    if ((m_fd = open(m_file_path.c_str(), O_RDONLY)) == -1)
+    if ((fd_ = open(file_path_.c_str(), O_RDONLY)) == -1)
     {
         ERROR_EXIT("open");
     }
 
-    if (fstat(m_fd, &st) == -1)
+    if (fstat(fd_, &st) == -1)
     {
         ERROR_EXIT("fstat");
     }
 
-    m_program_length = static_cast<std::size_t>(st.st_size);
+    program_length_ = static_cast<std::size_t>(st.st_size);
 
-    mmap_res = mmap((void *)0, m_program_length, PROT_READ, MAP_PRIVATE, m_fd, 0);
+    mmap_res = ::mmap((void *)0, program_length_, PROT_READ, MAP_PRIVATE, fd_, 0);
     if (mmap_res == MAP_FAILED)
     {
         ERROR_EXIT("mmap");
     }
 
-    m_mmap_program = static_cast<std::uint8_t *>(mmap_res);
+    mmap_program_ = static_cast<std::uint8_t *>(mmap_res);
 }
 
-void ELF_parser::close_memory_map()
+void ELF_reader::close_memory_map()
 {
-    if (m_fd == -1)
+    if (fd_ == -1)
     {
         return;
     }
 
-    if (munmap(static_cast<void *>(m_mmap_program), m_program_length) == -1)
+    if (::munmap(static_cast<void *>(mmap_program_), program_length_) == -1)
     {
         ERROR_EXIT("munmap");
     }
 
-    if (close(m_fd) == -1)
+    if (::close(fd_) == -1)
     {
         ERROR_EXIT("close");
     }
-
-    initialize_members();
 }
 
-void ELF_parser::initialize_members(std::string file_path, int fd, 
+void ELF_reader::initialize_members(std::string file_path, int fd,
                                     std::size_t program_length, std::uint8_t *mmap_program)
 {
-    m_file_path = std::move(file_path);
-    m_fd = fd;
-    m_program_length = program_length;
-    m_mmap_program = mmap_program;
+    file_path_ = std::move(file_path);
+    fd_ = fd;
+    program_length_ = program_length;
+    mmap_program_ = mmap_program;
 }
 
 } // namespace elf_parser
