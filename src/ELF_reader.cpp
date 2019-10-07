@@ -437,15 +437,8 @@ void ELF_reader::show_file_header() const
     *          section header table holds the value zero.
     */
     printf("  Number of section headers:         ");
-    auto shnum = reinterpret_cast<const Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
-    if (shnum == 0)
-    {
-        printf("%d\n", file_header->e_shnum);
-    }
-    else
-    {
-        printf("%ld\n", shnum);
-    }
+    auto shnum = reinterpret_cast<Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
+    printf("%lu\n", shnum == 0 ? static_cast<decltype(shnum)>(file_header->e_shnum) : shnum);
 
     /*
     * e_shstrndx: This  member  holds  the section header table index of the entry associated with the
@@ -465,7 +458,7 @@ void ELF_reader::show_file_header() const
         printf("undefined value\n");
         break;
     case SHN_XINDEX:
-        printf("%d\n", reinterpret_cast<const Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_link);
+        printf("%d\n", reinterpret_cast<Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_link);
         break;
     default:
         printf("%d\n", file_header->e_shstrndx);
@@ -480,11 +473,11 @@ void ELF_reader::show_section_headers() const
     const char *section_string_table;
     Elf64_Xword section_number;
 
-    file_header = reinterpret_cast<const Elf64_Ehdr *>(mmap_program_);
-    section_table = reinterpret_cast<const Elf64_Shdr *>(mmap_program_ + file_header->e_shoff);
-    section_string_table = reinterpret_cast<const char *>(&mmap_program_[section_table[file_header->e_shstrndx].sh_offset]);
+    file_header = reinterpret_cast<Elf64_Ehdr *>(mmap_program_);
+    section_table = reinterpret_cast<Elf64_Shdr *>(mmap_program_ + file_header->e_shoff);
+    section_string_table = reinterpret_cast<char *>(&mmap_program_[section_table[file_header->e_shstrndx].sh_offset]);
 
-    section_number = reinterpret_cast<const Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
+    section_number = reinterpret_cast<Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
     if (section_number == 0)
     {
         section_number = file_header->e_shnum;
@@ -511,36 +504,126 @@ void ELF_reader::show_section_headers() const
         */
         switch (section_table[i].sh_type)
         {
+        // Section header table entry unused
         case SHT_NULL:
             printf("NULL             ");
             break;
+
+        // Program data
         case SHT_PROGBITS:
             printf("PROGBITS         ");
             break;
+
+        // Symbol table
         case SHT_SYMTAB:
             printf("SYMTAB           ");
             break;
+
+        // String table
         case SHT_STRTAB:
             printf("STRTAB           ");
             break;
+
+        // Relocation entries with addends
         case SHT_RELA:
             printf("RELA             ");
             break;
+
+        // Symbol hash table
         case SHT_HASH:
             printf("HASH             ");
             break;
-        case SHT_NOTE:
-            printf("NOTE             ");
-            break;
-        case SHT_REL:
-            printf("REL              ");
-            break;
-        case SHT_SHLIB:
-            printf("SHLIB            ");
-            break;
+
+        // Dynamic linking information
         case SHT_DYNAMIC:
             printf("DYNSYM           ");
             break;
+
+        // Notes
+        case SHT_NOTE:
+            printf("NOTE             ");
+            break;
+
+        // Program space with no data (bss)
+        case SHT_NOBITS:
+            printf("NOBITS           ");
+            break;
+
+        // Relocation entries, no addends
+        case SHT_REL:
+            printf("REL              ");
+            break;
+
+        // Reserved
+        case SHT_SHLIB:
+            printf("SHLIB            ");
+            break;
+
+        // Dynamic linker symbol table
+        case SHT_DYNSYM:
+            printf("DYNSYM           ");
+            break;
+
+        // Array of constructors
+        case SHT_INIT_ARRAY:
+            printf("INIT_ARRAY       ");
+            break;
+
+        // Array of destructors
+        case SHT_FINI_ARRAY:
+            printf("FINIT_ARRAY       ");
+            break;
+
+        // Array of pre-constructors
+        case SHT_PREINIT_ARRAY:
+            printf("PREINIT_ARRAY    ");
+            break;
+
+        // Section group
+        case SHT_GROUP:
+            printf("GROUP            ");
+            break;
+
+        // Extended section indeces
+        case SHT_SYMTAB_SHNDX:
+            printf("SYMTAB_SHNDX     ");
+            break;
+
+        // Object attributes
+        case SHT_GNU_ATTRIBUTES:
+            printf("GNU_ATTRIBUTES   ");
+            break;
+
+        // GNU-style hash table
+        case SHT_GNU_HASH:
+            printf("GNU_HASH         ");
+            break;
+
+        // Prelink library list
+        case SHT_GNU_LIBLIST:
+            printf("GNU_LIBLIST      ");
+            break;
+
+        // Checksum for DSO content
+        case SHT_CHECKSUM:
+            printf("CHECKSUM         ");
+            break;
+
+        // Version definition section
+        case SHT_GNU_verdef:
+            printf("VERDEF           ");
+            break;
+
+        // Version needs section
+        case SHT_GNU_verneed:
+            printf("VERNEED          ");
+            break;
+
+        // Version symbol table
+        case SHT_GNU_versym:
+            printf("VERSYM           ");
+            break;
+
         default:
             printf("Unknown          ");
             break;
@@ -596,8 +679,6 @@ void ELF_reader::show_section_headers() const
             flags.push_back('I');
         if (section_table[i].sh_flags & SHF_LINK_ORDER)
             flags.push_back('L');
-        if (section_table[i].sh_flags &  SHF_INFO_LINK)
-            flags.push_back('I');
         if (section_table[i].sh_flags & SHF_OS_NONCONFORMING)
             flags.push_back('O');
         if (section_table[i].sh_flags & SHF_GROUP)
