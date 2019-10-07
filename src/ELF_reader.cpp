@@ -458,10 +458,10 @@ void ELF_reader::show_file_header() const
         printf("undefined value\n");
         break;
     case SHN_XINDEX:
-        printf("%d\n", reinterpret_cast<Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_link);
+        printf("%u\n", reinterpret_cast<Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_link);
         break;
     default:
-        printf("%d\n", file_header->e_shstrndx);
+        printf("%u\n", file_header->e_shstrndx);
         break;
     }
 }
@@ -471,11 +471,15 @@ void ELF_reader::show_section_headers() const
     const Elf64_Ehdr *file_header;
     const Elf64_Shdr *section_table;
     const char *section_string_table;
+    size_t section_string_table_index;
     Elf64_Xword section_number;
 
     file_header = reinterpret_cast<Elf64_Ehdr *>(mmap_program_);
     section_table = reinterpret_cast<Elf64_Shdr *>(mmap_program_ + file_header->e_shoff);
-    section_string_table = reinterpret_cast<char *>(&mmap_program_[section_table[file_header->e_shstrndx].sh_offset]);
+    section_string_table_index = file_header->e_shstrndx == SHN_XINDEX ?
+         reinterpret_cast<Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_link :
+         file_header->e_shstrndx;
+    section_string_table = reinterpret_cast<char *>(&mmap_program_[section_table[section_string_table_index].sh_offset]);
 
     section_number = reinterpret_cast<Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
     if (section_number == 0)
@@ -496,7 +500,7 @@ void ELF_reader::show_section_headers() const
         * sh_name: This member specifies the name of the section.  Its value is an index into  the
         * section header string table section, giving the location of a null-terminated string.
         */
-        printf("%-16s  ", section_string_table+section_table[i].sh_name);
+        printf("%-16.16s  ", section_string_table+section_table[i].sh_name);
 
         /*
         * sh_type: This member categorizes the section's contents and semantics.
@@ -719,10 +723,10 @@ void ELF_reader::show_symbols() const
     Elf64_Xword section_number;
     std::size_t symbol_entry_number;
 
-    file_header = reinterpret_cast<const Elf64_Ehdr *>(mmap_program_);
-    section_table = reinterpret_cast<const Elf64_Shdr *>(mmap_program_ + file_header->e_shoff);
-    section_string_table = reinterpret_cast<const char *>(mmap_program_ + section_table[file_header->e_shstrndx].sh_offset);
-    section_number = reinterpret_cast<const Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
+    file_header = reinterpret_cast<Elf64_Ehdr *>(mmap_program_);
+    section_table = reinterpret_cast<Elf64_Shdr *>(mmap_program_ + file_header->e_shoff);
+    section_string_table = reinterpret_cast<char *>(mmap_program_ + section_table[file_header->e_shstrndx].sh_offset);
+    section_number = reinterpret_cast<Elf64_Shdr *>(&mmap_program_[file_header->e_shoff])->sh_size;
     if (section_number == 0)
     {
         section_number = file_header->e_shnum;
@@ -736,8 +740,8 @@ void ELF_reader::show_symbols() const
             symbol_entry_number = section_table[i].sh_size / section_table[i].sh_entsize;
             symbol_string_table = reinterpret_cast<char *>(&mmap_program_[section_table[i+1].sh_offset]);
 
-            printf("\nSymbol table '%s' contain %lu entrie%s:\n", &section_string_table[section_table[i].sh_name],
-                   symbol_entry_number, symbol_entry_number == 0 ? "" : "s");
+            printf("\nSymbol table '%s' contain %lu %s:\n", &section_string_table[section_table[i].sh_name],
+                   symbol_entry_number, symbol_entry_number == 0 ? "entry" : "entries");
             printf("   Num:    Value          Size Type    Bind   Vis      Ndx Name\n");
             for (decltype(symbol_entry_number) i = 0; i < symbol_entry_number; ++i)
             {
@@ -770,7 +774,7 @@ void ELF_reader::show_symbols() const
                     break;
                 }
 
-                switch (ELF64_ST_BIND(symbol_table[i].st_other))
+                switch (ELF64_ST_BIND(symbol_table[i].st_info))
                 {
                 case STB_LOCAL:
                     printf("LOCAL  ");
@@ -820,12 +824,10 @@ void ELF_reader::show_symbols() const
                     break;
                 }
 
-                printf("%s\n", &symbol_string_table[symbol_table[i].st_name]);
+                printf("%.25s\n", &symbol_string_table[symbol_table[i].st_name]);
             }
         }
     }
-
-    
 }
 
 void ELF_reader::load_memory_map()
@@ -845,7 +847,7 @@ void ELF_reader::load_memory_map()
 
     program_length_ = static_cast<std::size_t>(st.st_size);
 
-    mmap_res = ::mmap((void *)0, program_length_, PROT_READ, MAP_PRIVATE, fd_, 0);
+    mmap_res = ::mmap(nullptr, program_length_, PROT_READ, MAP_PRIVATE, fd_, 0);
     if (mmap_res == MAP_FAILED)
     {
         ERROR_EXIT("mmap");
